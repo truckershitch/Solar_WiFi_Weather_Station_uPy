@@ -1,0 +1,47 @@
+{
+    "winter_time": {
+        "month": {
+            "short": "mon",
+            "value": 11
+        },
+        "last_possible_day_will_occur": {
+            "short": "last",
+            "value": 7
+        },
+        "weekday": {
+            "short": "wd",
+            "value": 1
+        },
+        "hour": {
+            "short": "hr",
+            "value": 2
+        },
+        "minute": {
+            "short": "min",
+            "value": 0
+        }
+    },
+    "summer_time": {
+        "month": {
+            "short": "mon",
+            "value": 3
+        }, 
+        "last_possible_day_will_occur": {
+            "short": "last",
+            "value": 14
+        },
+        "weekday": {
+            "short": "wd",
+            "value": 1
+        },
+        "hour": {
+            "short": "hr",
+            "value": 2
+        },
+        "minute": {
+            "short": "min",
+            "value": 0
+        }
+    },
+    "minutes_to_adjust": 60
+}

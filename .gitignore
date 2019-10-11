@@ -1,2 +1,5 @@
 config.json
 !config.json.sample
+esp_init_data_default.bin
+firmware-combined.bin
+blynklib.py

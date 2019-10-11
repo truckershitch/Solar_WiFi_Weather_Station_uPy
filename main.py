@@ -42,8 +42,8 @@ def main():
 
     if result['apps']['thingspeak']['enabled']:
         SendThingspeak(result['apps']['thingspeak']['host'],
-                       result['apps']['thingspeak']['api_key'],
-                       result['values'][:8])
+                    result['apps']['thingspeak']['api_key'],
+                    result['values'][:8])
 
     if result['apps']['blynk']['enabled']:
         SendBlynk(result['apps']['blynk']['auth'],
@@ -51,10 +51,10 @@ def main():
 
     if result['apps']['mqtt']['enabled']:
         paused = SendMQTT(result['apps']['mqtt'],
-                          result['values'])
+                        result['values'])
 
     WriteTimestamp(result['verify_file'],
-                   result['timestamp'])
+                result['timestamp'])
     
     if not paused:
         GoToSleep(result['sleep_time_secs'])

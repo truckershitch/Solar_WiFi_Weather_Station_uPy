@@ -39,7 +39,7 @@ def LoadConfig():
     f = open('config.json', 'r')
     return ujson.loads(f.read())
 
-def ConnectWiFi(CONF_WIFI, ERRORFILE):
+def ConnectWiFi(CONF_WIFI, SLEEP_TIME_MIN, ERRORFILE):
     import network
 
     sta_if = network.WLAN(network.STA_IF)
@@ -56,9 +56,9 @@ def ConnectWiFi(CONF_WIFI, ERRORFILE):
             count += 1
             print('.', end='')
             if count == 15:
-                from cycle_machine import ResetMachine
-                print('Could not connect.  Performing reset.')
-                ResetMachine(ERRORFILE, 'Could not connect to network')
+                from cycle_machine import GoToSleep
+                print('Could not connect.  Taking a nap.')
+                GoToSleep(SLEEP_TIME_MIN * 60, ERRORFILE, 'Could not connect to network.')
             time.sleep(1)
     print('network config:', sta_if.ifconfig())
 
@@ -78,7 +78,7 @@ def SetNTPTime(NTP_HOSTS, SLEEP_TIME_MIN, ERRORFILE):
         if count == 5:
             from cycle_machine import GoToSleep
             print('Could not connect to NTP Server!\nSleeping...')
-            GoToSleep(SLEEP_TIME_MIN * 60, ERRORFILE, 'Could not connect to NTP Server')
+            GoToSleep(SLEEP_TIME_MIN * 60, ERRORFILE, 'Could not connect to NTP Server.')
 
     del sys.modules['sntp']
     gc.collect()
@@ -255,7 +255,7 @@ def main():
 
     CONF = LoadConfig()
 
-    ConnectWiFi(CONF['wifi'], CONF['file']['ERRORFILE'])
+    ConnectWiFi(CONF['wifi'], CONF['other']['SLEEP_TIME_MIN'], CONF['file']['ERRORFILE'])
 
     ConfigureTime(CONF['time'], CONF['other']['SLEEP_TIME_MIN'], CONF['file']['ERRORFILE'])
 
@@ -271,9 +271,9 @@ def main():
     ts_diff = current_timestamp - saved_timestamp + dst_adjustment
     print('Timestamp difference: %s' % ts_diff)
 
-    if ts_diff > 6 * SECS_IN_HOUR:
+    if ts_diff >= 6 * SECS_IN_HOUR:
         FirstTimeRun(CONF['file'], result['rel_Pres_Rounded_hPa'])
-    elif ts_diff > SECS_IN_HOUR / 2:
+    elif ts_diff >= SECS_IN_HOUR / 2:
         # prepend list with new pressure value and move it right one notch
         pressure_value = [result['rel_Pres_Rounded_hPa']] + pressure_value[:-1]
 
@@ -287,12 +287,13 @@ def main():
     # make sure  we record on the half hour
     interval = CONF['other']['SLEEP_TIME_MIN'] * 60
     diff_from_half_hour = SECS_IN_HOUR / 2 - ts_diff
-    if ts_diff > SECS_IN_HOUR / 2:
+
+    if ts_diff >= SECS_IN_HOUR / 2:
         sleep_time_secs = interval
-    elif int(diff_from_half_hour / interval):
+    elif diff_from_half_hour - interval >= 0: # diff is more than interval
         sleep_time_secs = interval
     else:
-        sleep_time_secs = int(diff_from_half_hour)
+        sleep_time_secs = diff_from_half_hour # diff is less than interval
 
     (ZambrettisWords,
      trend_in_words,

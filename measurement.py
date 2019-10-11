@@ -1,6 +1,6 @@
 def TakeMeasurement(CONF_WEATHER):
     from machine import Pin, I2C, ADC
-    from math import pow
+    from math import pow, sqrt, fabs
     from time import sleep
     import sys
     import bme280_float # https://github.com/robert-hh/BME280
@@ -60,32 +60,35 @@ def TakeMeasurement(CONF_WEATHER):
     output.append('Dewpoint Spread: %.2f °F; ' % result['dewPtSpread_F'])
 
     # Calculate HI (heatindex) --> HI starts working above 26.7°C
+    # Reference: https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
+    # Calculation is in Fahrenheit
     if temp_C > 26.7:
-        c1 = -8.784
-        c2 = 1.611
-        c3 = 2.338
-        c4 = -0.146
-        c5 = -1.230e-2
-        c6 = -1.642e-2
-        c7 = 2.211e-3
-        c8 = 7.254e-4
-        c9 = -2.582e-6
-        
-        T = temp_C
-        R = result['humidity']
+        c1 = - 42.379
+        c2 =    2.04901523
+        c3 =   10.14333127
+        c4 = -  0.22475541
+        c5 = -  6.83783e-3
+        c6 = -  5.481717e-2
+        c7 =    1.22874e-3
+        c8 =    8.5282e-4
+        c9 = -  1.99e-6
     
-        A = ((c5 * T) + c2) * T + c1
-        B = ((c7 * T) + c4) * T + c3
-        C = ((c9 * T) + c8) * T + c6
-        # result['heatIndex_C'] = (C * R + B) * R + A
-        # result['heatIndex_F'] = convertToF(result['heatIndex_C'])
-        result['heatIndex_F'] = convertToF((C * R + B) * R + A)
-        # output.append('HeatIndex: %.2f °C, %.2f °F; ' % (result['heatIndex_C'], result['heatIndex_F']))
+        T = result['temp_F']
+        R = result['humidity']
+        Tsq = T * T
+        Rsq = R * R
+
+        result['heatIndex_F'] = (c1 + c2 * T + c3 * R + c4 * T * R + c5 * Tsq
+                                 + c6 * Rsq + c7 * Tsq * R + c8 * T * Rsq + c9 * Tsq * Rsq)
+
+        if T < 112 and R < 13:
+            result['heatIndex_F'] -= ((13 - R) / 4) * sqrt((17 - fabs(T - 95.0)) / 17)
+        if T < 87 and R > 85:
+            result['heatIndex_F'] += ((R - 85) / 10) * ((87 - T) / 5)
+
         output.append('HeatIndex: %.2f °F; ' % result['heatIndex_F'])
     else:
-        # result['heatIndex_C'] = result['temp_C']
         result['heatIndex_F'] = result['temp_F']
-        # print('Not warm enough (less than 26.7 °C) for Heat Index')
         print('Not warm enough (less than 80.1 °F) for Heat Index')
 
     # Battery Voltage

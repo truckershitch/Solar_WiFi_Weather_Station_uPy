@@ -183,7 +183,7 @@ def MakePrediction(language, rel_Pres_Rounded_hPa, pressure_value, accuracy, mon
     print('Prediction accuracy: %d%%' % accuracy_in_percent)
     if accuracy < 12:
         print('Reason: Not enough data yet.')
-        print('We need %d hours more to get sufficient data.' % ((12 - accuracy) / 2))
+        print('We need %s hours more to get sufficient data.' % ((12 - accuracy) / 2))
     print('**********************************************************')
 
     return ZambrettisWords, trend_in_words, accuracy_in_percent

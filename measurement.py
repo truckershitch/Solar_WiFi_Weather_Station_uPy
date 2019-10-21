@@ -81,9 +81,9 @@ def TakeMeasurement(CONF_WEATHER):
         result['heatIndex_F'] = (c1 + c2 * T + c3 * R + c4 * T * R + c5 * Tsq
                                  + c6 * Rsq + c7 * Tsq * R + c8 * T * Rsq + c9 * Tsq * Rsq)
 
-        if T < 112 and R < 13:
+        if T <= 112 and R < 13:
             result['heatIndex_F'] -= ((13 - R) / 4) * sqrt((17 - fabs(T - 95.0)) / 17)
-        if T < 87 and R > 85:
+        if T <= 87 and R > 85:
             result['heatIndex_F'] += ((R - 85) / 10) * ((87 - T) / 5)
 
         output.append('HeatIndex: %.2f °F; ' % result['heatIndex_F'])

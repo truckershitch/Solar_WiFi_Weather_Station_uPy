@@ -1,6 +1,6 @@
-# Solar Wifi Weather Station version 0.4.0
+# Solar Wifi Weather Station
 # Very alpha at this stage
-# Last updated June 9, 2019
+# Last updated October 19, 2019
 #
 # This is heavily based on 3KUdelta's Solar WiFi Weather Station.
 # There was much cutting and pasting!
@@ -13,6 +13,8 @@
 # output on my machine locally, thus MicroPython.
 # It also helps me hone my craft, whatever little I have :)
 #
+
+VERSION = '0.5.0'
 
 import time, sys, gc
 
@@ -34,10 +36,10 @@ accuracy = 0                    # Counter, if enough values for accurate forecas
 # END GLOBAL VARIABLES
 
 def LoadConfig():
-    import ujson
+    import json
 
     f = open('config.json', 'r')
-    return ujson.loads(f.read())
+    return json.loads(f.read())
 
 def ConnectWiFi(CONF_WIFI, SLEEP_TIME_MIN, ERRORFILE):
     import network
@@ -250,7 +252,7 @@ def main():
     
     pressure_value = [] # holds 12 pressure values in hPa (6 hours data, [0] most recent)
 
-    print('Start of Solar WiFi Weather Station 0.4.0')
+    print('Start of Solar WiFi Weather Station %s' % VERSION)
     print('Free mem: %d' % gc.mem_free())
 
     CONF = LoadConfig()
@@ -286,14 +288,18 @@ def main():
 
     # make sure  we record on the half hour
     interval = CONF['other']['SLEEP_TIME_MIN'] * 60
-    diff_from_half_hour = SECS_IN_HOUR / 2 - ts_diff
+    diff_from_half_hour = ts_diff - SECS_IN_HOUR / 2 # pos. if past half hour
 
-    if ts_diff >= SECS_IN_HOUR / 2:
+    if diff_from_half_hour >= 0:
+         # at least 30 mins. have passed
         sleep_time_secs = interval
-    elif diff_from_half_hour - interval >= 0: # diff is more than interval
-        sleep_time_secs = interval
+    elif diff_from_half_hour + interval > 0:
+        # diff_from_half_hour is negative! but closer to zero than interval
+        # only partial time left
+        sleep_time_secs = -diff_from_half_hour
     else:
-        sleep_time_secs = diff_from_half_hour # diff is less than interval
+        # difference >= interval; just sleep for interval
+        sleep_time_secs = interval
 
     (ZambrettisWords,
      trend_in_words,
@@ -318,6 +324,7 @@ def main():
         'apps': CONF['apps'],
         'sleep_time_secs': sleep_time_secs,
         'verify_file': CONF['file']['VERIFYFILE'],
+        'error_file': CONF['file']['ERRORFILE'],
         'timestamp': current_timestamp
     }
 

@@ -1,3 +1,4 @@
+rshell_rsync/
 config.json
 !config.json.sample
 esp_init_data_default.bin

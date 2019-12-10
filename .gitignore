@@ -1,6 +1,9 @@
 rshell_rsync/
+scratch/
 config.json
 !config.json.sample
 esp_init_data_default.bin
 firmware-combined.bin
 blynklib.py
+bme280_float.py
+

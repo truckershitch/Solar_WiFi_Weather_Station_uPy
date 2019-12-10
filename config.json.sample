@@ -6,8 +6,9 @@
         },
         "thingspeak": {
             "enabled": true,
-            "host": "api.thingspeak.com",
-            "api_key": "thingspeak_api_key"
+            "host": "mqtt.thingspeak.com",
+            "channel_id": 12345,
+            "api_key": "thingspeak_write_api_key"
         },
         "mqtt": {
             "enabled": true,

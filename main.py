@@ -8,9 +8,9 @@ def GatherData():
 
     return result
 
-def SendThingspeak(host, api_key, data):
+def SendThingspeak(host, api_key, channel_id, data):
     import send_thingspeak
-    send_thingspeak.SendToThingspeak(host, api_key, data)
+    send_thingspeak.SendToThingspeak(host, api_key, channel_id, data)
     del sys.modules['send_thingspeak']
     gc.collect()
 
@@ -43,7 +43,8 @@ def main():
     if result['apps']['thingspeak']['enabled']:
         SendThingspeak(result['apps']['thingspeak']['host'],
                     result['apps']['thingspeak']['api_key'],
-                    result['values'][:8])
+                    result['apps']['thingspeak']['channel_id'],
+                    result['values'])
 
     if result['apps']['blynk']['enabled']:
         SendBlynk(result['apps']['blynk']['auth'],
@@ -62,5 +63,4 @@ def main():
         import sys
         sys.exit()
 
-if __name__ == '__main__':
-    main()
+main()

@@ -288,17 +288,14 @@ def main():
 
     # make sure  we record on the half hour
     interval = CONF['other']['SLEEP_TIME_MIN'] * 60
-    diff_from_half_hour = ts_diff - SECS_IN_HOUR / 2 # pos. if past half hour
+    diff_from_half_hour = SECS_IN_HOUR / 2 - ts_diff
 
     if diff_from_half_hour >= 0:
-         # at least 30 mins. have passed
-        sleep_time_secs = interval
-    elif diff_from_half_hour + interval > 0:
-        # diff_from_half_hour is negative! but closer to zero than interval
-        # only partial time left
-        sleep_time_secs = -diff_from_half_hour
+        if diff_from_half_hour >= interval:
+            sleep_time_secs = interval
+        else:
+            sleep_time_secs = diff_from_half_hour
     else:
-        # difference >= interval; just sleep for interval
         sleep_time_secs = interval
 
     (ZambrettisWords,

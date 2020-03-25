@@ -114,10 +114,10 @@ def ConfigureTime(CONF_TIME, SLEEP_TIME_MIN, ERRORFILE):
     print('Current UNIX timestamp: %d\nDST Status: %d\nDate & Time: %s'
           % (current_timestamp, curr_dst_status, FmtDateTime(current_timestamp)))
 
-def MeasurementEvent(CONF_WEATHER):
+def MeasurementEvent(CONF_WEATHER, batt_calib):
     import measurement
 
-    result = measurement.TakeMeasurement(CONF_WEATHER)
+    result = measurement.TakeMeasurement(CONF_WEATHER, batt_calib)
     
     del sys.modules['measurement']
     gc.collect()
@@ -261,7 +261,7 @@ def main():
 
     ConfigureTime(CONF['time'], CONF['other']['SLEEP_TIME_MIN'], CONF['file']['ERRORFILE'])
 
-    result = MeasurementEvent(CONF['weather']) #acquire sensor data
+    result = MeasurementEvent(CONF['weather'], CONF['other']['BATT_CALIB']) #acquire sensor data
 
     pressure_value = ReadDataFile(CONF['file'], result['rel_Pres_Rounded_hPa']) #read stored values and update data if more recent data is available
 

@@ -1,4 +1,4 @@
-def TakeMeasurement(CONF_WEATHER):
+def TakeMeasurement(CONF_WEATHER, calib_factor):
     from machine import Pin, I2C, ADC
     from math import pow, sqrt, fabs
     from time import sleep
@@ -93,7 +93,6 @@ def TakeMeasurement(CONF_WEATHER):
 
     # Battery Voltage
     # Voltage Divider R1 = 220k+100k+220k = 540K and R2 = 100k
-    calib_factor = 5.1315 # varies -- fix for your battery
     adc = ADC(0)
     raw = adc.read()
     result['volt'] = raw * calib_factor / 1024

@@ -49,6 +49,7 @@
     },
     "other": {
         "LANGUAGE": "EN",  
-        "SLEEP_TIME_MIN": 10
+        "SLEEP_TIME_MIN": 10,
+        "BATT_CALIB": 5.1958
     }
 }

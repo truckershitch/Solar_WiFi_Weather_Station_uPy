@@ -20,21 +20,17 @@ def SendBlynk(blynk_auth, data):
     del sys.modules['send_blynk']
     gc.collect()
 
-def SendMQTT(CONF, data):
+def SendMQTT(mqtt_conf, data):
     import send_mqtt
-    paused = send_mqtt.SendToMQTT(CONF, data)
+    paused = send_mqtt.SendToMQTT(mqtt_conf, data)
     del sys.modules['send_mqtt']
     gc.collect()
 
     return paused
 
-def WriteTimestamp(logfile, timestamp):
-    f = open(logfile, 'w')
-    f.write('%d\n' % timestamp)
-    f.close()
-
 def main():
     from cycle_machine import GoToSleep
+    from machine import RTC
     
     result = GatherData()
 
@@ -54,8 +50,8 @@ def main():
         paused = SendMQTT(result['apps']['mqtt'],
                         result['values'])
 
-    WriteTimestamp(result['verify_file'],
-                result['timestamp'])
+    rtc = RTC()
+    rtc.memory(rtc.memory()[:-1] + '1')
     
     if not paused:
         GoToSleep(result['sleep_time_secs'])

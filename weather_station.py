@@ -1,6 +1,6 @@
 # Solar Wifi Weather Station
-# Very alpha at this stage
-# Last updated October 19, 2019
+# Beta stage
+# Last updated April 28, 2020
 #
 # This is heavily based on 3KUdelta's Solar WiFi Weather Station.
 # There was much cutting and pasting!
@@ -9,29 +9,39 @@
 # https://www.instructables.com/id/Solar-Powered-WiFi-Weather-Station-V20/
 # Everyone has done very solid work!  I am impressed!
 #
-# I wanted to be able to update the code over WiFi and watch the serial
-# output on my machine locally, thus MicroPython.
+# I wanted to be able to update the code over WiFi and watch
+# the serial output on my machine locally, thus MicroPython.
 # It also helps me hone my craft, whatever little I have :)
 #
+# 2020-04-28
+# Changed storage of Zambretti data to RTC memory to avoid
+# wearing out flash memory with writes and rewrites.
+# Errors are still logged to flash but maybe this is
+# unnecessary.
+# 2020-05-23
+# Changed Zambretti forecast period to 3 hours.
 
-VERSION = '0.5.0'
+VERSION = '0.7.0'
 
 import time, sys, gc
 
-# DST CALCULATION
-SECS_IN_DAY = 86400
-SECS_IN_HOUR = 3600
-DST_ADJ_AMT = 0                 # Amount of seconds to adjust for seasonal time change
-                                # See dst_us.json for sample configuration
-curr_dst_status = 0             # Currrent DST Status -- 0 = Winter, 1 = Summer
-saved_dst_status = 0            # DST Status stored in SPIFFS
+# DST CALCULATION            # See dst_us.json for sample configuration
+SECS_IN_DAY         = 86400
+SECS_IN_HOUR        = 3600
+DST_ADJ_AMT         = 0      # Amount of seconds to adjust for seasonal
+                             # time change.  Calculated in dst.py and
+                             # configured in dst_your_country.json
+
+curr_dst_status     = 0      # Currrent DST Status
+                             # 0 = Winter, 1 = Summer
+saved_dst_status    = 0      # DST Status stored in RTC memory
 
 # FORECAST CALCULATION
-current_timestamp = 0           # Actual timestamp read from NTPtime
-saved_timestamp = 0             # Timestamp stored in SPIFFS
-
-# FORECAST RESULT
-accuracy = 0                    # Counter, if enough values for accurate forecasting
+current_timestamp   = 0      # Timestamp read from NTPtime
+last_pval_timestamp = 0      # Timestamp of last recorded pressure value
+                             # in RTC memory
+pval_count          = 6      # Number of pressure values
+accuracy            = 0      # Accuracy counter for forecasting
 
 # END GLOBAL VARIABLES
 
@@ -124,80 +134,69 @@ def MeasurementEvent(CONF_WEATHER, batt_calib):
 
     return result
 
-def FirstTimeRun(CONF_FILE, rel_Pres_Rounded_hPa):
+def FirstTimeRun(rel_Pres_Rounded_hPa):
     from cycle_machine import ResetMachine
+    from machine import RTC
 
     global accuracy
 
     print('---> Starting initialization process')
+    rtc = RTC()
     accuracy = 1
-    try:
-        myDataFile = open(CONF_FILE['DATAFILE'], 'w')
-    except:
-        print('ERROR: Failed to open datafile.')
-        print('Stopping process - there is an OS problem here.')
-        sys.exit()
 
-    myDataFile.write('%d\n%d\n%d\n%d\n'
-                      % (current_timestamp,
-                         curr_dst_status,
-                         accuracy,
-                         current_timestamp))
-    for _ in range(12):
-        myDataFile.write('%d\n' % rel_Pres_Rounded_hPa)
-    print('*** Saved initial pressure data. ***')
-    myDataFile.close()
+    data = '%d,%d,%d,%d,' % (current_timestamp,
+                             curr_dst_status,
+                             accuracy,
+                             current_timestamp)
+    for _ in range(pval_count):
+        data += '%d,' % rel_Pres_Rounded_hPa
+    print('---> Saved initial pressure data')
+    data += '1'
 
-    myDataFile = open(CONF_FILE['VERIFYFILE'], 'w')
-    myDataFile.write('%d\n' % current_timestamp)
-    myDataFile.close()
-
+    rtc.memory(data)
+    
     print('Doing a reset now.')
     ResetMachine()
-    
-def VerifyLastRunCompleted(verify_ts, VERIFYFILE, ERRORFILE):
-    f = open(VERIFYFILE, 'r')
-    last_ts = int(f.readline())
-    f.close()
 
-    if last_ts != verify_ts:
+def VerifyLastRunCompleted(flag, timestamp, ERRORFILE):
+    if not flag:
         import machine
+        from cycle_machine import WriteError
 
-        f = open(ERRORFILE, 'a+')
-        f.write('Reset after %s\tCause: %s\n'
-                % (FmtDateTime(verify_ts), machine.reset_cause()))
-        f.close()
+        WriteError(ERRORFILE, 'Reset cause: %s'
+                % machine.reset_cause(), timestamp)
 
-def ReadDataFile(CONF_FILE, rel_Pres_Rounded_hPa):
-    global saved_dst_status, saved_timestamp, accuracy
+def ReadRTCMemory(ERRORFILE, rel_Pres_Rounded_hPa):
+    from machine import RTC
 
-    try:
-        myDataFile = open(CONF_FILE['DATAFILE'], 'r')
-    except:
-        print('Failed to open file for reading -- assuming First Run')
-        FirstTimeRun(CONF_FILE, rel_Pres_Rounded_hPa)
+    global saved_dst_status, last_pval_timestamp, accuracy
+
+    rtc = RTC()
+
+    print('---> Now reading ESP8266 RTC memory')
+    data = rtc.memory()
     
-    print('---> Now reading from ESP8266')
+    if not data:
+        print('Empty RTC memory -- assuming First Run')
+        FirstTimeRun(rel_Pres_Rounded_hPa)
 
-    saved_timestamp  = int(myDataFile.readline())
-    saved_dst_status = int(myDataFile.readline())
-    accuracy         = int(myDataFile.readline())
-    verifier         = int(myDataFile.readline())
-    
-    VerifyLastRunCompleted(verifier, CONF_FILE['VERIFYFILE'], CONF_FILE['ERRORFILE'])
+    data_list = [int(i) for i in data.split(b',')]
 
-    print('Saved Timestamp: %d\nSaved DST Status: %d\nSaved Accuracy Value: %d'
-          % (saved_timestamp, saved_dst_status, accuracy))
+    last_pval_timestamp = data_list[0]
+    saved_dst_status    = data_list[1]
+    accuracy            = data_list[2]
+    last_run_timestamp  = data_list[3]
+    flag                = data_list[:-1]    
 
-    pressure_value = []
-    for _ in range(12):
-        pval = int(myDataFile.readline())
-        pressure_value.append(pval)
-    print('Last 12 saved pressure values:', ('%d; ' * 12)[:-2] % tuple(pressure_value))
+    VerifyLastRunCompleted(flag, last_run_timestamp, ERRORFILE)
 
-    myDataFile.close()
+    pressure_values = []
+    for i in range(4, pval_count + 4):
+        pressure_values.append(data_list[i])
+    print('Last %d saved pressure values:' % pval_count,
+             ('%d; ' * pval_count)[:-2] % tuple(pressure_values))
 
-    return pressure_value
+    return pressure_values
 
 def CheckForTimeChange():
     # Has the time just changed?
@@ -211,32 +210,30 @@ def CheckForTimeChange():
     else:
         return 0
 
-def WriteDataFile(write_timestamp, DATAFILE, pressure_value):
-    try:
-        myDataFile = open(DATAFILE, 'w')
-        print('---> Now writing to ESP8266')
+def WriteRTCMemory(write_timestamp, pressure_value):
+    from machine import RTC
 
-        myDataFile.write('%d\n%d\n%d\n%d\n'
-                          % (write_timestamp,
-                             curr_dst_status,
-                             accuracy,
-                             current_timestamp))
-        for value in pressure_value:
-            myDataFile.write('%d\n' % value)
-        
-        myDataFile.close()
+    rtc = RTC()
+    print('---> Now writing to ESP8266 RTC memory')
+    
+    data = '%d,%d,%d,%d,' % (write_timestamp,
+                            curr_dst_status,
+                            accuracy,
+                            current_timestamp)
+    for val in pressure_value:
+        data += '%d,' % val
+    data += '0' # flag as unverified
 
-    except:
-        print('ERROR: Failure writing to data file!')
-        sys.exit()
+    rtc.memory(data)
 
-def ZambrettiPrediction(LANGUAGE, rel_Pres_Rounded_hPa, pressure_value):
+def ZambrettiPrediction(LANGUAGE, Z_DATA, rel_Pres_Rounded_hPa, pressure_value):
     import zambretti
 
     month = time.localtime(current_timestamp)[1]
     
     prediction = zambretti.MakePrediction(
                         LANGUAGE,
+                        Z_DATA,
                         rel_Pres_Rounded_hPa,
                         pressure_value,
                         accuracy,
@@ -250,7 +247,7 @@ def ZambrettiPrediction(LANGUAGE, rel_Pres_Rounded_hPa, pressure_value):
 def main():
     global accuracy
     
-    pressure_value = [] # holds 12 pressure values in hPa (6 hours data, [0] most recent)
+    pressure_value = [] # pressure values in hPa (1 per half hour, [0] most recent)
 
     print('Start of Solar WiFi Weather Station %s' % VERSION)
     print('Free mem: %d' % gc.mem_free())
@@ -261,30 +258,32 @@ def main():
 
     ConfigureTime(CONF['time'], CONF['other']['SLEEP_TIME_MIN'], CONF['file']['ERRORFILE'])
 
-    result = MeasurementEvent(CONF['weather'], CONF['other']['BATT_CALIB']) #acquire sensor data
+    #acquire sensor data
+    result = MeasurementEvent(CONF['weather'], CONF['other']['BATT_CALIB'])
 
-    pressure_value = ReadDataFile(CONF['file'], result['rel_Pres_Rounded_hPa']) #read stored values and update data if more recent data is available
+    #read stored values and update data if more recent data is available
+    pressure_value = ReadRTCMemory(CONF['file']['ERRORFILE'], result['rel_Pres_Rounded_hPa'])
 
     if CONF['time']['DST']['USE_DST']:
         dst_adjustment = CheckForTimeChange()
     else:
         dst_adjustment = 0
 
-    ts_diff = current_timestamp - saved_timestamp + dst_adjustment
+    ts_diff = current_timestamp - last_pval_timestamp + dst_adjustment
     print('Timestamp difference: %s' % ts_diff)
 
-    if ts_diff >= 6 * SECS_IN_HOUR:
-        FirstTimeRun(CONF['file'], result['rel_Pres_Rounded_hPa'])
+    if ts_diff >= pval_count / 2 * SECS_IN_HOUR:
+        FirstTimeRun(result['rel_Pres_Rounded_hPa'])
     elif ts_diff >= SECS_IN_HOUR / 2:
         # prepend list with new pressure value and move it right one notch
         pressure_value = [result['rel_Pres_Rounded_hPa']] + pressure_value[:-1]
 
-        if accuracy < 12:
+        if accuracy < pval_count:
             accuracy += 1
         
-        WriteDataFile(current_timestamp, CONF['file']['DATAFILE'], pressure_value)
+        WriteRTCMemory(current_timestamp, pressure_value)
     else:
-        WriteDataFile(saved_timestamp + dst_adjustment, CONF['file']['DATAFILE'], pressure_value)
+        WriteRTCMemory(last_pval_timestamp + dst_adjustment, pressure_value)
 
     # make sure  we record on the half hour
     interval = CONF['other']['SLEEP_TIME_MIN'] * 60
@@ -301,6 +300,7 @@ def main():
     (ZambrettisWords,
      trend_in_words,
      accuracy_in_percent) = ZambrettiPrediction(CONF['other']['LANGUAGE'],
+                                                CONF['weather']['ZAMBRETTI'],
                                                 result['rel_Pres_Rounded_hPa'],
                                                 pressure_value)
 

@@ -14,7 +14,6 @@ def SendToThingspeak(host, api_key, channel_id, result):
         client.publish(topic, payload)
         client.disconnect()
 
-        print('Payload: %s' % payload)
         print('Sent data to Thingspeak via MQTT')
     except:
         print('Failed to send data to Thingspeak via MQTT')

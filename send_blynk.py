@@ -17,9 +17,9 @@ def SendToBlynk(blynk_auth, result):
 
     from time import sleep
     import sys, gc
-    import blynklib
+    import blynklib_mp
 
-    blynk = blynklib.Blynk(blynk_auth)
+    blynk = blynklib_mp.Blynk(blynk_auth)
 
     CONNECT_PRINT_MSG = '[CONNECT_EVENT]'
     DISCONNECT_PRINT_MSG = '[DISCONNECT_EVENT]'
@@ -43,5 +43,5 @@ def SendToBlynk(blynk_auth, result):
     blynk.run()
 
     del blynk
-    del sys.modules['blynklib']
+    del sys.modules['blynklib_mp']
     gc.collect()

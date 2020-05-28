@@ -1,9 +1,16 @@
+.vscode/
 rshell_rsync/
 scratch/
+umqtt/
+urllib/
+*.mpy
 config.json
 !config.json.sample
 esp_init_data_default.bin
-firmware-combined.bin
+firmware*
+yaota8266.bin
 blynklib.py
+blynklib_mp.py
 bme280_float.py
+bme280_int.py
 

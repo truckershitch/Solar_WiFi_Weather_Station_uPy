@@ -3,7 +3,8 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     from math import pow, sqrt, fabs
     from time import sleep
     import sys
-    import bme280_float # https://github.com/robert-hh/BME280
+    #import bme280_float # https://github.com/robert-hh/BME280
+    import bme280_int
 
     result = {}
 
@@ -11,7 +12,8 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
         return tempC * 1.8 + 32
 
     i2c = I2C(scl=Pin(5), sda=Pin(4))
-    bme = bme280_float.BME280(i2c=i2c)
+    #bme = bme280_float.BME280(i2c=i2c)
+    bme = bme280_int.BME280(i2c=i2c)
 
     # wait a sec
     sleep(1)
@@ -22,20 +24,24 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     # Get Temperature
     # result['temp_C'] = bme_data_tph[0] + CONF_WEATHER['TEMP_CORR']
     # result['temp_F'] = convertToF(result['temp_C'])
-    temp_C = bme_data_tph[0] + CONF_WEATHER['TEMP_CORR']
+    #temp_C = bme_data_tph[0] + CONF_WEATHER['TEMP_CORR']
+    temp_C = bme_data_tph[0] / 100.0 + CONF_WEATHER['TEMP_CORR']
     result['temp_F'] = convertToF(temp_C)
 
     # output = ['Temp: %.2f °C, %.2f °F; ' % (result['temp_C'], result['temp_F'])]
     output = ['Temp: %.2f °C, %.2f °F; ' % (temp_C, result['temp_F'])]
 
     # Get Humidity
-    result['humidity'] = bme_data_tph[2]
+    #result['humidity'] = bme_data_tph[2]
+    result['humidity'] = bme_data_tph[2] / 1024.0
     output.append('Humidity: %.2f %%; ' % result['humidity'])
 
     # Get Pressure
     # result['measured_Pres_hPa'] = bme_data_tph[1] / 100
-    measured_Pres_hPa = bme_data_tph[1] / 100
-    result['measured_Pres_inHg'] = bme_data_tph[1] / 3386.38867
+    #measured_Pres_hPa = bme_data_tph[1] / 100
+    measured_Pres_hPa = bme_data_tph[1] / 25600.0
+    #result['measured_Pres_inHg'] = bme_data_tph[1] / 3386.38867
+    result['measured_Pres_inHg'] = bme_data_tph[1] / 866915.49952
     # output.append('Pressure: %.2f hPa, %.2f inHg; ' % (result['measured_Pres_hPa'], result['measured_Pres_inHg']))
     output.append('Pressure: %.2f hPa, %.2f inHg; ' % (measured_Pres_hPa, result['measured_Pres_inHg']))
 
@@ -98,14 +104,13 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     result['volt'] = raw * calib_factor / 1024
     output.append('Voltage: %.2f V\n' % result['volt'])
 
-    #print(''.join(output))
-    for item in output:
-        print('%s' % item, end='')
-    del output
+    print(''.join(output))
+    
     # round floats to 2 decimal places
     result = dict(zip(result, map(lambda x: round(x, 2) if isinstance(x, float) else x, result.values())))
 
     del bme
-    del sys.modules['bme280_float']
+    #del sys.modules['bme280_float']
+    del sys.modules['bme280_int']
 
     return result

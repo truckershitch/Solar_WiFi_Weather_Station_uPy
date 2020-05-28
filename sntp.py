@@ -36,7 +36,7 @@ def settime(ntpservers):
         tm = tm[0:3] + (0,) + tm[3:6] + (0,) # reformat to suit rtc
         rtc=RTC()
         rtc.datetime(tm) # write into rtc
-        print("Time sync:",asctime())
+        print("Time sync: %s UTC" % asctime())
     else:
         print("Time sync fail")
     return (t != 0)

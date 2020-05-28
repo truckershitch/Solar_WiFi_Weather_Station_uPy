@@ -1,40 +1,53 @@
-def CalcuateTrend(language, pressure_value):
+def CalculateTrend(language, pressure_value):
+    # See https://www.statisticshowto.com/sens-slope-theil-sen-estimator/
     import json, gc
     
-    trend = 0
-    trend_in_words = ''
-    print('---> Calculating Pressure Trend')
+    print('---> Calculating Pressure Trend using Sens Slope')
 
-    # weighted average calculation
-    p_diff = (pressure_value[0] - pressure_value[1]) * 1.5
-    for i, p_val in enumerate(pressure_value[2:], 2): # 12 elements currently, start i at 2
-        p_diff += (pressure_value[0] - p_val) / (i * 0.5) # denominator: {1, 1.5, 2, ..., 5.5}
-    p_diff = p_diff / 11
+    # calculate all slopes
+    slopes = []
+    n = len(pressure_value)
+    
+    for i in range(n):
+        for j in range(i + 1, n):
+            slopes.append((pressure_value[i] - pressure_value[j]) / (j - i))
 
-    print('Current trend:', p_diff)
+    slope_count = len(slopes)
+    slopes.sort()
 
-    f = open('zamb_' + language + '.json', 'r')
+    # calculate median of slopes
+    if slope_count % 2 == 0:
+        median_1 = slopes[slope_count // 2]
+        median_2 = slopes[slope_count // 2 - 1]
+        median = (median_1 + median_2) / 2
+    else:
+        median = slopes[slope_count // 2]
+
+    print('Current trend: %.02f' % median)
+
+    f = open('zamb_%s.json' % language, 'r')
     ZAMB = json.loads(f.read())
 
-    if p_diff > 3.5:
+    # values subject to change
+    if     1    <= median:
         trend_in_words = ZAMB['TEXT_RISING_FAST']
         trend = 1
-    elif p_diff > 1.5 and p_diff <= 3.5:
+    elif   0.60 <= median <   1:
         trend_in_words = ZAMB['TEXT_RISING']
         trend = 1
-    elif p_diff > 0.25 and p_diff <= 1.5:
+    elif   0.27 <= median <   0.6:
         trend_in_words = ZAMB['TEXT_RISING_SLOW']
         trend = 1
-    elif p_diff > -0.25 and p_diff <= 0.25:
+    elif  -0.27 <  median <   0.27:
         trend_in_words = ZAMB['TEXT_STEADY']
         trend = 0
-    elif p_diff > -1.5 and p_diff <= -0.25:
+    elif  -0.60 <  median <= -0.27:
         trend_in_words = ZAMB['TEXT_FALLING_SLOW']
         trend = -1
-    elif p_diff > -3.5 and p_diff <= -1.5:
+    elif  -1    <  median <= -0.6:
         trend_in_words = ZAMB['TEXT_FALLING']
         trend = -1
-    elif p_diff <= -3.5:
+    elif           median <= -1:
         trend_in_words = ZAMB['TEXT_FALLING_FAST']
         trend = -1
 
@@ -45,111 +58,77 @@ def CalcuateTrend(language, pressure_value):
 
     return trend, trend_in_words
 
-def ZambrettiLetter(rel_Pres_Rounded_hPa, z_trend, month):
-    # Returns Zambretti Letter
+def ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, z_trend, month):
+    # Calculates and returns Zambretti Letter
+
+    def limit(num, minimum, maximum):
+        # keep num in range of maximum and minimum
+        return max(min(num, maximum), minimum)
+
+    def is_summer():
+        if hemisphere == 'N':
+            if 5 < month < 10:
+                return True
+        elif hemisphere == 'S':
+            if month < 3 or month > 10:
+                return True
+        return False
+
+    def is_winter():
+        if hemisphere == 'N':
+            if month < 3 or month > 10:
+                return True
+        elif hemisphere == 'S':
+            if 5 < month < 10:
+                return True
+        return False
 
     print('---> Calculating Zambretti letter')
-    z_letter = ''
-    # Case trend is falling
+
+    letters =   {
+                   -1: ['A', 'B', 'D', 'H', 'O', 'R',
+                        'U', 'V', 'X'],
+                    0: ['A', 'B', 'E', 'K', 'N', 'P',
+                        'S', 'W', 'X', 'Z'],
+                    1: ['A', 'B', 'C', 'F', 'G', 'I',
+                        'J', 'L', 'M', 'Q', 'T', 'Y', 'Z']
+                }
+    constants = {
+                    -1: {'a':  0.000974614, 'b': -2.10680,   'c': 1138.70   },
+                     0: {'a': -1.36338E-4,  'b':  0.138805,  'c':    2.77547},
+                     1: {'a':  1.01291E-4,  'b': -0.352833,  'c':  256.876  }
+                }
+    # range of pressure in Zambretti chart
+    PZ_MIN, PZ_MAX = 947, 1050
+    # local area pressure range
+    Pl_Min, Pl_Max = z_data['PRESSURE']['PRESSURE_MIN'], z_data['PRESSURE']['PRESSURE_MAX']
+    hemisphere = z_data['HEMISPHERE'] # 'N' or 'S' (or neither)
+
+    # linearly adjust pressure to range of pressures in Zambretti chart
+    Pz = ( ( rel_Pres_Rounded_hPa * (PZ_MAX - PZ_MIN)
+             - PZ_MAX * Pl_Min
+             + PZ_MIN * Pl_Max ) / 
+           (Pl_Max - Pl_Min) )
+
+    # use quadratic regression to get Zambretti value
+    # ax^2 + bx + c
+    a, b, c = (constants[z_trend]['a'],
+               constants[z_trend]['b'],
+               constants[z_trend]['c'])
+    zambretti = round(a * Pz * Pz + b * Pz + c)
+
+    # crude adjustment for winter/summer
     if z_trend == -1:
-        zambretti = (0.000974614 * rel_Pres_Rounded_hPa * rel_Pres_Rounded_hPa
-                     - 2.10680 * rel_Pres_Rounded_hPa + 1138.70)
-        if month < 4  or month > 9:
-            zambretti = zambretti + 1
-        int_zambretti = round(zambretti)
-        print('Calculated and rounded Zambretti in numbers: ', end='')
-        print(int_zambretti)
-        if int_zambretti == 0:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 1:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 2:
-            z_letter = 'B' #Fine Weather
-        elif int_zambretti == 3:
-            z_letter = 'D' #Fine Becoming Less Settled
-        elif int_zambretti == 4:
-            z_letter = 'H' #Fairly Fine Showers Later
-        elif int_zambretti == 5:
-            z_letter = 'O' #Showery Becoming unsettled
-        elif int_zambretti == 6:
-            z_letter = 'R' #Unsettled, Rain later
-        elif int_zambretti == 7:
-            z_letter = 'U' #Rain at times, worse later
-        elif int_zambretti == 8:
-            z_letter = 'V' #Rain at times, becoming very unsettled
-        elif int_zambretti == 9:
-            z_letter = 'X' #Very Unsettled, Rain
+        if is_winter():
+            zambretti -= 1
+    elif z_trend == 1:
+        if is_summer():
+            zambretti += 1
 
-    # Case trend is steady
-    if z_trend == 0:
-        #zambretti = 138.24 - 0.133 * rel_Pres_Rounded_hPa
-        zambretti = (-1.36338E-4 * rel_Pres_Rounded_hPa * rel_Pres_Rounded_hPa
-                     + 0.138805 * rel_Pres_Rounded_hPa + 2.77547)
-        int_zambretti = round(zambretti)
-        print('Calculated and rounded Zambretti in numbers: ', end='')
-        print(int_zambretti)
-        if int_zambretti == 0:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 1:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 2:
-            z_letter = 'B' #Fine Weather
-        elif int_zambretti == 3:
-            z_letter = 'E' #Fine, Possibly showers
-        elif int_zambretti == 4:
-            z_letter = 'K' #Fairly Fine, Showers likely
-        elif int_zambretti == 5:
-            z_letter = 'N' #Showery Bright Intervals
-        elif int_zambretti == 6:
-            z_letter = 'P' #Changeable some rain
-        elif int_zambretti == 7:
-            z_letter = 'S' #Unsettled, rain at times
-        elif int_zambretti == 8:
-            z_letter = 'W' #Rain at Frequent Intervals
-        elif int_zambretti == 9:
-            z_letter = 'X' #Very Unsettled, Rain
-        elif int_zambretti >= 10:
-            z_letter = 'Z' #Stormy, much rain
-
-    # Case trend is rising
-    if z_trend == 1:
-        #zambretti = 160.346 - 0.155 * rel_Pres_Rounded_hPa
-        zambretti = (-3.50216E-05 * rel_Pres_Rounded_hPa * rel_Pres_Rounded_hPa
-                     - 0.0857548 * rel_Pres_Rounded_hPa + 126.111)
-        #A Summer rising, improves the prospects by 1 unit over a Winter rising
-        if month < 4 or month > 9:
-            zambretti = zambretti + 1
-        int_zambretti = round(zambretti)
-        print('Calculated and rounded Zambretti in numbers: ', end='')
-        print(int_zambretti)
-        if int_zambretti == 0:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 1:
-            z_letter = 'A' #Settled Fine
-        elif int_zambretti == 2:
-            z_letter = 'B' #Fine Weather
-        elif int_zambretti == 3:
-            z_letter = 'C' #Becoming Fine
-        elif int_zambretti == 4:
-            z_letter = 'F' #Fairly Fine, Improving
-        elif int_zambretti == 5:
-            z_letter = 'G' #Fairly Fine, Possibly showers, early
-        elif int_zambretti == 6:
-            z_letter = 'I' #Showery Early, Improving
-        elif int_zambretti == 7:
-            z_letter = 'J' #Changeable, Improving
-        elif int_zambretti == 8:
-            z_letter = 'L' #Rather Unsettled Clearing Later
-        elif int_zambretti == 9:
-            z_letter = 'M' #Unsettled, Probably Improving
-        elif int_zambretti == 10:
-            z_letter = 'Q' #Unsettled, short fine Intervals
-        elif int_zambretti == 11:
-            z_letter = 'T' #Very Unsettled, Finer at times
-        elif int_zambretti == 12:
-            z_letter = 'Y' #Stormy, possibly improving
-        elif int_zambretti >= 13:
-            z_letter = 'Z' #Stormy, much rain
+    zambretti = limit(zambretti, 1, len(letters[z_trend]))
+    z_letter = letters[z_trend][zambretti - 1] # list starts at 0
+    
+    print('Calculated and rounded Zambretti value: %d' % zambretti)
     print('This is Zambretti\'s famous letter: %s' % z_letter)
 
     return z_letter
@@ -161,9 +140,10 @@ def ZambrettiSays(language, code):
 
     f = open('zamb_' + language + '.json', 'r')
     ZAMB = json.loads(f.read())
+    f.close()
     
     if code:
-        zambrettis_words = ZAMB['TEXT_ZAMBRETTI_' + code]
+        zambrettis_words = ZAMB['TEXT_ZAMBRETTI_%s' % code]
     else:
         zambrettis_words = ZAMB['TEXT_ZAMBRETTI_DEFAULT']
 
@@ -172,18 +152,19 @@ def ZambrettiSays(language, code):
 
     return zambrettis_words
 
-def MakePrediction(language, rel_Pres_Rounded_hPa, pressure_value, accuracy, month):
-    accuracy_in_percent = int(accuracy * 94 / 12)
+def MakePrediction(language, z_data, rel_Pres_Rounded_hPa, pressure_value, accuracy, month):
+    pval_count = len(pressure_value)
+    accuracy_in_percent = int(accuracy * 94 / pval_count)
 
-    trend, trend_in_words = CalcuateTrend(language, pressure_value)
+    trend, trend_in_words = CalculateTrend(language, pressure_value)
 
-    ZambrettisWords = ZambrettiSays(language, ZambrettiLetter(rel_Pres_Rounded_hPa, trend, month))
+    ZambrettisWords = ZambrettiSays(language, ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, trend, month))
     print('**********************************************************')
     print('Zambretti says: %s, ' % ZambrettisWords, end='')
     print('Prediction accuracy: %d%%' % accuracy_in_percent)
-    if accuracy < 12:
+    if accuracy < pval_count:
         print('Reason: Not enough data yet.')
-        print('We need %s hours more to get sufficient data.' % ((12 - accuracy) / 2))
+        print('We need %s hours more to get sufficient data.' % ((pval_count - accuracy) / 2))
     print('**********************************************************')
 
     return ZambrettisWords, trend_in_words, accuracy_in_percent

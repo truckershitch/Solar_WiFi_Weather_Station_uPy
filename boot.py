@@ -7,7 +7,8 @@ import gc
 import webrepl
 webrepl.start()
 gc.collect()
-#import sys
+import sys
+#not needed 2023-06-23
 #del sys.path[0]
 #sys.path.append('')
 

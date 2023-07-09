@@ -3,7 +3,6 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     from math import pow, sqrt, fabs
     from time import sleep
     import sys
-    #import bme280_float # https://github.com/robert-hh/BME280
     import bme280_int
 
     result = {}
@@ -22,27 +21,19 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     bme_data_tph = bme.read_compensated_data()
 
     # Get Temperature
-    # result['temp_C'] = bme_data_tph[0] + CONF_WEATHER['TEMP_CORR']
-    # result['temp_F'] = convertToF(result['temp_C'])
-    #temp_C = bme_data_tph[0] + CONF_WEATHER['TEMP_CORR']
     temp_C = bme_data_tph[0] / 100.0 + CONF_WEATHER['TEMP_CORR']
     result['temp_F'] = convertToF(temp_C)
 
-    # output = ['Temp: %.2f °C, %.2f °F; ' % (result['temp_C'], result['temp_F'])]
     output = ['Temp: %.2f °C, %.2f °F; ' % (temp_C, result['temp_F'])]
 
     # Get Humidity
-    #result['humidity'] = bme_data_tph[2]
     result['humidity'] = bme_data_tph[2] / 1024.0
     output.append('Humidity: %.2f %%; ' % result['humidity'])
 
     # Get Pressure
-    # result['measured_Pres_hPa'] = bme_data_tph[1] / 100
-    #measured_Pres_hPa = bme_data_tph[1] / 100
     measured_Pres_hPa = bme_data_tph[1] / 25600.0
     #result['measured_Pres_inHg'] = bme_data_tph[1] / 3386.38867
     result['measured_Pres_inHg'] = bme_data_tph[1] / 866915.49952
-    # output.append('Pressure: %.2f hPa, %.2f inHg; ' % (result['measured_Pres_hPa'], result['measured_Pres_inHg']))
     output.append('Pressure: %.2f hPa, %.2f inHg; ' % (measured_Pres_hPa, result['measured_Pres_inHg']))
 
     # Calculate Relative Pressure
@@ -55,9 +46,7 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     output.append('Pressure rel: %d hPa, %.2f inHg; ' % (result['rel_Pres_Rounded_hPa'], result['rel_Pres_inHg']))
 
     # Get Dewpoint
-    # result['dewPt_C'] = bme.dew_point
-    # result['dewPt_F'] = convertToF(result['dewPt_C'])
-    result['dewPt_F'] = convertToF(bme.dew_point)
+    result['dewPt_F'] = convertToF(bme.dew_point / 100 + CONF_WEATHER['TEMP_CORR'])
     # output.append('Dewpoint: %.2f °C, %.2f °F; ' % (result['dewPt_C'], result['dewPt_F']))
     output.append('Dewpoint: %.2f °F; ' % result['dewPt_F'])
 
@@ -102,15 +91,24 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     adc = ADC(0)
     raw = adc.read()
     result['volt'] = raw * calib_factor / 1024
-    output.append('Voltage: %.2f V\n' % result['volt'])
+    output.append('Voltage: %.2f V; ' % result['volt'])
+
+    del bme
+    del sys.modules['bme280_int']
+    
+    from moisture import take_moisture
+    moisture_reading = take_moisture(i2c=i2c)
+    result['moisture'] = moisture_reading[0]
+    
+    output.append('Moisture value: %s; Moisture Voltage: %s V\n' %
+                  (moisture_reading[0], moisture_reading[1]))
 
     print(''.join(output))
     
     # round floats to 2 decimal places
     result = dict(zip(result, map(lambda x: round(x, 2) if isinstance(x, float) else x, result.values())))
 
-    del bme
-    #del sys.modules['bme280_float']
-    del sys.modules['bme280_int']
+    del take_moisture
+    del sys.modules['moisture']
 
     return result

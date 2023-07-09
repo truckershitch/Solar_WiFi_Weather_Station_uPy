@@ -58,6 +58,8 @@ def CalculateTrend(language, pressure_value):
 
     return trend, trend_in_words
 
+# def ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, z_trend, month):
+## TODO
 def ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, z_trend, month):
     # Calculates and returns Zambretti Letter
 
@@ -152,13 +154,19 @@ def ZambrettiSays(language, code):
 
     return zambrettis_words
 
-def MakePrediction(language, z_data, rel_Pres_Rounded_hPa, pressure_value, accuracy, month):
+# def MakePrediction(language, z_data, rel_Pres_Rounded_hPa, pressure_value, accuracy, month):
+## TODO
+def MakePrediction(z_data, rel_Pres_Rounded_hPa, pressure_value, accuracy, month):
     pval_count = len(pressure_value)
     accuracy_in_percent = int(accuracy * 94 / pval_count)
 
-    trend, trend_in_words = CalculateTrend(language, pressure_value)
+    # trend, trend_in_words = CalculateTrend(language, pressure_value)
+    ## TODO
+    trend, trend_in_words = CalculateTrend(z_data['LANGUAGE'], pressure_value)
 
-    ZambrettisWords = ZambrettiSays(language, ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, trend, month))
+    # ZambrettisWords = ZambrettiSays(language, ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, trend, month))
+    ## TODO
+    ZambrettisWords = ZambrettiSays(z_data['LANGUAGE'], ZambrettiLetter(rel_Pres_Rounded_hPa, z_data, trend, month))
     print('**********************************************************')
     print('Zambretti says: %s, ' % ZambrettisWords, end='')
     print('Prediction accuracy: %d%%' % accuracy_in_percent)

@@ -1,0 +1,39 @@
+{
+    "wifi": {
+        "ssid": "ssid",
+        "pass": "password"
+    },
+    "weather": {
+        "TEMP_CORR": -1,
+        "ELEVATION": 14,
+        "ZAMBRETTI": {
+            "LANGUAGE": "EN",
+            "HEMISPHERE": "N",
+            "PRESSURE": {
+                "PRESSURE_MIN": 1001,
+                "PRESSURE_MAX": 1034
+            }
+        }
+    },
+    "file": {
+        "ERRORFILE": "/error.log"
+    },
+    "time": {
+        "NTP_HOSTS": [
+            "0.us.pool.ntp.org",
+            "1.us.pool.ntp.org",
+            "2.us.pool.ntp.org",
+            "3.us.pool.ntp.org"
+        ],
+        "TZ": -5,
+        "DST": {
+            "USE_DST": true,
+            "COUNTRY": "US"
+        }
+    },
+    "other": {
+        "SLEEP_TIME_MIN": 15,
+        "BATT_CALIB": 5.365,
+        "WT_AVG_FACTOR": 2.0
+    }
+}

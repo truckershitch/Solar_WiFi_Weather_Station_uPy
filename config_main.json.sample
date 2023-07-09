@@ -1,0 +1,32 @@
+{
+    "apps": {
+        "blynk": {
+            "enabled": false,
+            "auth": "key"
+        },
+        "thingspeak": {
+            "enabled": false,
+            "host": "mqtt.thingspeak.com",
+            "channel_id": 796389,
+            "user": "some@dude.com",
+            "api_key": "key"
+        },
+        "mqtt": {
+            "enabled": true,
+            "mqttBroker": "192.168.1.50",
+            "mqttPort": 1883,
+            "mqttUser": "user",
+            "mqttPass": "password",
+            "mqttClientName": "weather_station",
+            "mqttPubTopic": "ha/weather_stn/data",
+            "mqttSubTopic": "ha/weather_stn/paused"
+        }
+    },
+    "file": {
+        "ERRORFILE": "/error.log"
+    },
+    "other": {
+        "LANGUAGE": "EN",  
+        "SLEEP_TIME_MIN": 15
+    }
+}

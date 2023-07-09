@@ -3,9 +3,12 @@ rshell_rsync/
 scratch/
 umqtt/
 urllib/
+__pycache__/
 *.mpy
 config.json
 !config.json.sample
+config_ws.json
+config_main.json
 esp_init_data_default.bin
 firmware*
 yaota8266.bin
@@ -13,4 +16,5 @@ blynklib.py
 blynklib_mp.py
 bme280_float.py
 bme280_int.py
-
+ads1x15.py
+test_custom_error.py

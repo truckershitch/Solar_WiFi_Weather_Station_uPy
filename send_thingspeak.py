@@ -1,8 +1,13 @@
-def SendToThingspeak(host, api_key, channel_id, result):
+def SendToThingspeak(host, user, api_key, channel_id, result):
     from umqtt.simple import MQTTClient
 
     try:
-        client = MQTTClient('umqtt_client', host)
+        client = MQTTClient(
+            client_id='umqtt_client',
+            server=host,
+            user=user,
+            password=api_key,
+            ssl=False)
 
         topic = 'channels/%s/publish/%s' % (channel_id, api_key)
 

@@ -20,7 +20,8 @@ def SendToMQTT(CONF, result):
                             CONF['mqttBroker'],
                             CONF['mqttPort'],
                             CONF['mqttUser'],
-                            CONF['mqttPass'])
+                            CONF['mqttPass'],
+                            keepalive=60)
         # Subscribed messages will be delivered to this callback
         client.set_callback(sub_cb)
         client.connect()
@@ -55,6 +56,11 @@ def SendToMQTT(CONF, result):
         prefix = 'Failed to connect'
     print('%s to MQTT Broker' % prefix)
 
+    wait_timeout = 0
+    while wait_timeout < 3:
+        client.check_msg()        
+        wait_timeout += 0.1
+
     if send_payload:
         payload = create_payload()
         if publish(client, CONF['mqttPubTopic'].encode(), payload.encode()):
@@ -62,5 +68,7 @@ def SendToMQTT(CONF, result):
         else:
             prefix = 'Failed to send'
         print('%s payload to MQTT Broker' % prefix)
+
+    client.disconnect()
 
     return paused

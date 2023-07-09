@@ -7,29 +7,16 @@ def WriteError(errorfile, reason, timestamp):
     f.write('\n')
     f.close()
 
-def ResetMachine(errorfile=None, reason=None, timestamp=None):
-    from time import sleep
-    import machine
-
-    if errorfile and reason:
-        WriteError(errorfile, reason, timestamp)
-
-    machine.reset()
-    sleep(5) # reset is not immediate
-
-def GoToSleep(sleep_time_secs, errorfile=None, reason=None, timestamp=None):
+def GoToSleep(sleep_time_secs):
     # sleep_time_secs may be a float
-    
-    from time import localtime
     import machine
+    from time import localtime, sleep
+    from user_except import CustomResetError
 
     if sleep_time_secs <= 0:
-        ResetMachine(errorfile,
-                    'Tried to sleep for %s seconds'
-                    % sleep_time_secs, timestamp)
+        raise CustomResetError('Tried to sleep for %s seconds')
 
-    if errorfile and reason:
-        WriteError(errorfile, reason, timestamp)
+    sleep(1)
 
     calib = 41 * sleep_time_secs # rtc is a little fast!
     nap_time_ms = sleep_time_secs * 1000 + calib

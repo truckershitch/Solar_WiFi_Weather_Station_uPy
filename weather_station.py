@@ -262,7 +262,7 @@ def WriteRTCMemory(p_write_timestamp, pressure_value, m_write_timestamp, moistur
 
     rtc.memory(data)
 
-    print('Wrote:\n%s\nto RTC memory\n' % data)
+    print('Wrote:\n"%s"\nto RTC memory\n' % data)
 
 def ZambrettiPrediction(Z_DATA, rel_Pres_Rounded_hPa, pressure_value):
     import zambretti
@@ -281,9 +281,9 @@ def ZambrettiPrediction(Z_DATA, rel_Pres_Rounded_hPa, pressure_value):
 
     return prediction
 
-def MoistureWeightedAverage(WT_AVG_FACTOR, moisture_data):
+def MoistureWeightedAverage(FACTOR_MAX, FACTOR_MIN, moisture_data):
     # weighted moisture average
-    weights = [round(WT_AVG_FACTOR - i * (WT_AVG_FACTOR - 1) / (mval_count - 1), 2) for i in range(mval_count)]
+    weights = [round(FACTOR_MAX - i * (FACTOR_MAX - FACTOR_MIN) / (mval_count - 1), 2) for i in range(mval_count)]
     wt_avg_num = sum([moisture_data[i] * weights[i] for i in range(len(moisture_data))])
     wt_avg_denom = sum(weights[:len(moisture_data)]) # could be sum(weights)
     moisture_avg = round(wt_avg_num / wt_avg_denom, 2)
@@ -403,7 +403,12 @@ def main():
                                    result['rel_Pres_Rounded_hPa'],
                                    pressure_value)
 
-    moisture_avg = w.wrap(MoistureWeightedAverage, CONF['other']['WT_AVG_FACTOR'], moisture_value)
+    moisture_avg = w.wrap(
+        MoistureWeightedAverage,
+        CONF['other']['WT_AVG_FACTOR_MAX'],
+        CONF['other']['WT_AVG_FACTOR_MIN'],
+        moisture_value
+    )
 
     package = {
         'values':[

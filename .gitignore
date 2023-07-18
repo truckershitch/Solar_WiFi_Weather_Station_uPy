@@ -1,12 +1,8 @@
 .vscode/
 rshell_rsync/
 scratch/
-umqtt/
-urllib/
 __pycache__/
 *.mpy
-config.json
-!config.json.sample
 config_ws.json
 config_main.json
 esp_init_data_default.bin

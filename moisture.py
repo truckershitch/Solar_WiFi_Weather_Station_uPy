@@ -18,15 +18,14 @@ def take_moisture(i2c=None):
         ads = ads1x15.ADS1115(i2c, addr, gain)
 
         value = ads.read(rate=rate, channel1=channel)
+        voltage = ads.raw_to_v(value)
+
+        # cleanup
+        del ads
+        del sys.modules['ads1x15']
+
+        return (value, voltage)
     except Exception as e:
         raise CustomHWError('Error reading moisture sensor: %s' % e)
-    
-    voltage = ads.raw_to_v(value)
-
-    # cleanup
-    del ads
-    del sys.modules['ads1x15']
-
-    return (value, voltage)
 
 # ADDR to GND to set address? NOT NEEDED PER ADAFRUIT

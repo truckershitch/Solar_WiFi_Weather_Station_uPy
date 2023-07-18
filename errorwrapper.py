@@ -28,13 +28,13 @@ class ErrorWrapper(object):
                 from weather_station import FmtDateTime
                 file.write('%s\n' % FmtDateTime(self._timestamp))
             sys.print_exception(exception, file)
+         print('Error: Logged to %s' % self._log)
 
     def sleep_it_off(self, exc, mins=None):
         from cycle_machine import GoToSleep
         sleep_mins = mins if mins is not None else self._sleep_mins
 
         self.write_exception(exc)
-        print('Error: Logged to %s' % self._log)
         print('Sleeping for %d minutes' % sleep_mins)
         GoToSleep(sleep_time_secs=sleep_mins * 60)
 
@@ -42,7 +42,6 @@ class ErrorWrapper(object):
         import machine
 
         self.write_exception(exception=exc)
-        print('Error: Logged to %s' % self._log)
         print('Calling machine.reset()')
         machine.reset()
 

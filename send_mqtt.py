@@ -1,3 +1,5 @@
+from user_except import CustomNetworkError
+
 def SendToMQTT(CONF, result):
     from umqtt.simple import MQTTClient
 
@@ -54,6 +56,8 @@ def SendToMQTT(CONF, result):
         prefix = 'Connected'
     except OSError:
         prefix = 'Failed to connect'
+        raise CustomNetworkError('%s to MQTT Broker')
+
     print('%s to MQTT Broker' % prefix)
 
     wait_timeout = 0

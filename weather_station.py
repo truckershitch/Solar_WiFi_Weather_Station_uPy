@@ -1,6 +1,6 @@
 # Solar Wifi Weather Station
 # Beta stage
-# Last updated July 1, 2023
+# Last updated July 17, 2023
 #
 # This is heavily based on 3KUdelta's Solar WiFi Weather Station.
 # There was much cutting and pasting!
@@ -27,8 +27,8 @@
 #   -- WriteRTCMemory() was badly indented and not called
 # 2023-07-02 -- switched back to ntptime (slightly modified)
 
-VERSION = '0.18.1'
-MOD_DATE = 'July 4, 2023'
+VERSION = '0.20.1'
+MOD_DATE = 'July 18, 2023'
 
 import time, sys, gc
 from user_except import CustomNetworkError, CustomResetError, CustomHWError
@@ -313,7 +313,9 @@ def main():
     #acquire sensor data
     result = w.wrap(ReadSensors, CONF['weather'], CONF['other']['BATT_CALIB'])
     if result is None:
-        raise CustomHWError('Error reading sensors. Check hardware!')
+        w.call_reset(exc='Error reading sensors. Check hardware!')        
+    elif result['moisture'] == 0:
+        w.sleep_it_off(exc='Moisture sensor read zero!', mins=3)
 
     (pressure_value, moisture_value) = w.wrap(
         ReadRTCMemory,

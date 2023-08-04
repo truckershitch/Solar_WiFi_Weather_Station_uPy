@@ -39,7 +39,8 @@ def time(host):
         # (date(1970, 1, 1) - date(1900, 1, 1)).days * 24*60*60
         NTP_DELTA = 2208988800
     else:
-        raise Exception("Unsupported epoch: {}".format(EPOCH_YEAR))
+        print("Unsupported epoch: {}".format(EPOCH_YEAR))
+        return 0
 
     return val - NTP_DELTA
 

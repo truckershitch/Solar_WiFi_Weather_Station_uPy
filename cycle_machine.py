@@ -14,7 +14,8 @@ def GoToSleep(sleep_time_secs):
     from user_except import CustomResetError
 
     if sleep_time_secs <= 0:
-        raise CustomResetError('Tried to sleep for %s seconds')
+        print('Tried to sleep for %s seconds. Calling reset')
+        machine.reset()
 
     sleep(1)
 

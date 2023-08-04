@@ -12,7 +12,7 @@
 from user_except import CustomNetworkError, CustomResetError, CustomHWError
 
 class ErrorWrapper(object):
-    def __init__(self, log, timestamp=None, sleep_mins=15):
+    def __init__(self, log, timestamp=None, sleep_mins=10):
         self._log = log
         self._timestamp = timestamp
         self._sleep_mins = sleep_mins

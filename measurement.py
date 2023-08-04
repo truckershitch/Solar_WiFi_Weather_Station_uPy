@@ -1,21 +1,20 @@
-def TakeMeasurement(CONF_WEATHER, calib_factor):
-    from machine import Pin, I2C, ADC
-    from math import pow, sqrt, fabs
-    from time import sleep
-    import sys
-    import bme280_int
+from machine import Pin, I2C, ADC
+from math import pow, sqrt, fabs
+from time import sleep
+import sys
+import bme280_int
 
+def TakeMeasurement(CONF_WEATHER, calib_factor):
     result = {}
 
     def convertToF(tempC):
         return tempC * 1.8 + 32
 
     i2c = I2C(scl=Pin(5), sda=Pin(4))
-    #bme = bme280_float.BME280(i2c=i2c)
     bme = bme280_int.BME280(i2c=i2c)
 
     # wait a sec
-    sleep(1)
+    sleep(0.5)
 
     # read data from bme280
     bme_data_tph = bme.read_compensated_data()
@@ -54,38 +53,50 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     result['dewPtSpread_F'] = result['temp_F'] - result['dewPt_F']
     output.append('Dewpoint Spread: %.2f °F; ' % result['dewPtSpread_F'])
 
-    # Calculate HI (heatindex) --> HI starts working above 26.7°C
-    # Reference: https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
-    # Calculation is in Fahrenheit
-    if temp_C > 26.7:
-        c1 = - 42.379
-        c2 =    2.04901523
-        c3 =   10.14333127
-        c4 = -  0.22475541
-        c5 = -  6.83783e-3
-        c6 = -  5.481717e-2
-        c7 =    1.22874e-3
-        c8 =    8.5282e-4
-        c9 = -  1.99e-6
+    def heat_index():
+        # Calculate HI (heatindex) --> HI starts working above 26.7°C
+        # Reference: https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
+        # See also: https://brownmath.com/bsci/notheat.htm#Eq5
+        # Calculation is in Fahrenheit
+
+        # The Rothfusz regression is not valid for extreme temperature and
+        # relative humidity conditions beyond the range of data considered by Steadman.
+
+        # Rothfusz regression
+        c1 = -42.379
+        c2 =   2.04901523
+        c3 =  10.14333127
+        c4 =  -0.22475541
+        c5 =  -0.00683783
+        c6 =  -0.05481717
+        c7 =   0.00122874
+        c8 =   0.00085282
+        c9 =  -0.00000199
     
         T = result['temp_F']
         R = result['humidity']
         Tsq = T * T
         Rsq = R * R
 
-        result['heatIndex_F'] = (c1 + c2 * T + c3 * R + c4 * T * R + c5 * Tsq
-                                 + c6 * Rsq + c7 * Tsq * R + c8 * T * Rsq + c9 * Tsq * Rsq)
+        hi = (c1 + (c2 * T) + (c3 * R) + (c4 * T * R) + (c5 * Tsq)
+                + (c6 * Rsq) + (c7 * Tsq * R) + (c8 * T * Rsq) + (c9 * Tsq * Rsq))
 
         if T <= 112 and R < 13:
-            result['heatIndex_F'] -= ((13 - R) / 4) * sqrt((17 - fabs(T - 95.0)) / 17)
+            hi -= ((13 - R) / 4) * sqrt((17 - fabs(T - 95.0)) / 17)
+            # hi -= (3.25 - 0.25 * R) * sqrt(1 - (fabs(T - 95) / 17))
         if T <= 87 and R > 85:
-            result['heatIndex_F'] += ((R - 85) / 10) * ((87 - T) / 5)
+            hi += ((R - 85) / 10) * ((87 - T) / 5)
+            # hi += (0.1 * R - 8.5) * (17.4 - 0.2 * T)
 
+        return hi
+
+    if temp_C >= 26.67:
+        result['heatIndex_F'] = heat_index()
         output.append('HeatIndex: %.2f °F; ' % result['heatIndex_F'])
     else:
-        result['heatIndex_F'] = result['temp_F']
         print('Not warm enough (less than 80.1 °F) for Heat Index')
-
+        result['heatIndex_F'] = result['temp_F']
+    
     # Battery Voltage
     # Voltage Divider R1 = 220k+100k+220k = 540K and R2 = 100k
     adc = ADC(0)

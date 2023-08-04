@@ -33,8 +33,9 @@
     },
     "other": {
         "SLEEP_TIME_MIN": 15,
-        "BATT_CALIB": 5.365,
+        "BATT_CALIB": 5.375,
+        "WT_AVG_HOURS": 1,
         "WT_AVG_FACTOR_MAX": 2.0,
-        "WT_AVG_FACTOR_MIN": 0.7
+        "WT_AVG_FACTOR_MIN": 0.5
     }
 }

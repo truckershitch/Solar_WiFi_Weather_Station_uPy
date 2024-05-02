@@ -26,16 +26,21 @@
 #   -- fixed timestamp condition
 #   -- WriteRTCMemory() was badly indented and not called
 # 2023-07-02 -- switched back to ntptime (slightly modified)
+# 2023-09-16 -- moved i2c to weather_station module
+# 2023-10-06 -- changed to ESP32 Mini to reduce components and power
+# 2023-10-27 -- added sunrise / sunset calculation
 
-VERSION = '0.21.1'
-MOD_DATE = 'July 28, 2023'
+VERSION = '0.23.2'
+MOD_DATE = 'November 3, 2023'
 
 import time, sys, gc
 from errorwrapper import ErrorWrapper
+from machine import Pin, I2C
 
 # DST CALCULATION            # See dst_us.json for sample configuration
 SECS_IN_DAY         = 86400
 SECS_IN_HOUR        = 3600
+SECS_IN_MIN         = 60
 DST_ADJ_AMT         = 0      # Amount of seconds to adjust for seasonal
                              # time change.  Calculated in dst.py and
                              # configured in dst_your_country.json
@@ -58,6 +63,8 @@ last_mval_timestamp = 0      # Timestamp of last recorded moisture value
 mval_count          = 12     # Number of moisture values (every 2 hours for 24 hours)
 
 e_wrap = ErrorWrapper('error.log', sleep_mins=10)
+
+i2c = I2C(scl=Pin(5), sda=Pin(4), freq=400000)
 
 # END GLOBAL VARIABLES
 
@@ -84,9 +91,9 @@ def ConnectWiFi(CONF_WIFI):
             count += 1
             print('.', end='')
             if count == 15:
-                print('No WiFi. Throwing CustomNetworkError.')
+                print('No WiFi. Sleeping.')
                 e_wrap.sleep_it_off(exc='No WiFi', mins=5)
-                                         
+
             time.sleep(1)
     print('network config:', sta_if.ifconfig())
 
@@ -143,14 +150,14 @@ def ConfigureTime(CONF_TIME):
 def ReadSensors(CONF_WEATHER, batt_calib):
     import measurement
 
-    result = measurement.TakeMeasurement(CONF_WEATHER, batt_calib)
+    result = measurement.TakeMeasurement(CONF_WEATHER, batt_calib, i2c)
 
     del sys.modules['measurement']
     gc.collect()
 
     return result
 
-def FirstRun(rel_Pres_Rounded_hPa, moisture_reading):
+def FirstRun(rel_Pres_Rounded_hPa):
     import machine
 
     global accuracy
@@ -171,6 +178,8 @@ def FirstRun(rel_Pres_Rounded_hPa, moisture_reading):
     #     data += '%d,' % moisture_reading
     # for _ in range(mval_count):
     #     data += '%d,' % int(reading[1] * 1000)
+
+    moisture_reading = e_wrap.wrap(MoistureReading)
     data += '%d,' % moisture_reading # just one
     print('---> Saved initial moisture data')
     data += '1'
@@ -180,20 +189,20 @@ def FirstRun(rel_Pres_Rounded_hPa, moisture_reading):
     print('Calling machine.reset()')
     machine.reset()
 
-def ReadRTCMemory(rel_Pres_Rounded_hPa, moisture_reading):
+def ReadRTCMemory(rel_Pres_Rounded_hPa):
     from machine import RTC
 
     global saved_dst_status, last_pval_timestamp, last_mval_timestamp, accuracy
 
     rtc = RTC()
 
-    print('---> Now reading ESP8266 RTC memory')
+    print('---> Now reading RTC memory')
     data = rtc.memory()
     print('Raw RTC memory data:\n%s\n' % data)
 
     if not data:
         print('Empty RTC memory -- calling FirstRun()')
-        FirstRun(rel_Pres_Rounded_hPa, moisture_reading)
+        FirstRun(rel_Pres_Rounded_hPa)
 
     data_list = [int(i) for i in data.split(b',')]
 
@@ -254,7 +263,7 @@ def WriteRTCMemory(p_write_timestamp, pressure_value, m_write_timestamp, moistur
     from machine import RTC
 
     rtc = RTC()
-    print('\n---> Now writing to ESP8266 RTC memory')
+    print('\n---> Now writing to RTC memory')
 
     data = '%d,%d,%d,%d,' % (p_write_timestamp,
                             m_write_timestamp,
@@ -288,18 +297,55 @@ def ZambrettiPrediction(Z_DATA, rel_Pres_Rounded_hPa, pressure_value):
 
     return prediction
 
+def MoistureReading():
+    from moisture import take_moisture_ads1x15 as t_m
+
+    moisture_reading = e_wrap.wrap(t_m, i2c)
+    print('Moisture value: %s' % moisture_reading)
+
+    if moisture_reading <= 0:
+        e_wrap.sleep_it_off(exc='Moisture reading: %s.  Sleeping' % moisture_reading, mins=3)
+
+    del t_m
+    del sys.modules['moisture']
+    gc.collect()
+
+    return moisture_reading
+
 def MoistureWeightedAverage(FACTOR_MAX, FACTOR_MIN, moisture_data):
     # weighted moisture average
-    weights = [round(FACTOR_MAX - i * (FACTOR_MAX - FACTOR_MIN) / (mval_count - 1), 2) for i in range(mval_count)]
-    wt_avg_num = sum([moisture_data[i] * weights[i] for i in range(len(moisture_data))])
-    wt_avg_denom = sum(weights[:len(moisture_data)]) # could be sum(weights)
+    # weights = [round(FACTOR_MAX - i * (FACTOR_MAX - FACTOR_MIN) / (mval_count - 1), 2) for i in range(mval_count)]
+    data_len = len(moisture_data)
+    weights = [round(FACTOR_MAX - i * (FACTOR_MAX - FACTOR_MIN) / max((data_len - 1), 1), 2) for i in range(data_len)]
+    wt_avg_num = sum([moisture_data[i] * weights[i] for i in range(data_len)])
+    wt_avg_denom = sum(weights[:data_len])
     moisture_avg = round(wt_avg_num / wt_avg_denom, 2)
 
     return moisture_avg
 
-def main():
-    from errorwrapper import ErrorWrapper
+def LDRReading():
+    from light import read_ldr_ads1x15 as read_ldr
 
+    ldr_reading = e_wrap.wrap(read_ldr, i2c)
+    print('\nLDR Reading: %s' % ldr_reading)
+
+    del read_ldr
+    del sys.modules['light']
+    gc.collect()
+
+    return ldr_reading
+
+def SunriseSunset(LAT, LONG, TZ):
+    import sunriseset
+
+    dst_offset = DST_ADJ_AMT if curr_dst_status == 1 else 0
+    params = (LAT, LONG, current_timestamp, TZ, dst_offset)
+    sunrise = sunriseset.sunrise(*params)
+    sunset = sunriseset.sunset(*params)
+    print('Sunrise: %s\nSunset: %s'
+          % (FmtDateTime(sunrise)[:-3], FmtDateTime(sunset)[:-3]))
+
+def main():
     global accuracy, e_wrap
 
     pressure_value = [] # pressure values in hPa (1 per half hour, [0] most recent)
@@ -315,18 +361,21 @@ def main():
     e_wrap.wrap(ConfigureTime, CONF['time'])
     e_wrap.set_ts(current_timestamp)
 
+    e_wrap.wrap(
+        SunriseSunset,
+        CONF['location']['LATITUDE'],
+        CONF['location']['LONGITUDE'],
+        CONF['time']['TZ']
+    )
+
     #acquire sensor data
     result = e_wrap.wrap(ReadSensors, CONF['weather'], CONF['other']['BATT_CALIB'])
     if result is None:
-        e_wrap.call_reset(exc='Error reading sensors. Check hardware! Calling reset')        
-    elif result['moisture'] <= 0:
-        e_wrap.sleep_it_off(exc='Moisture reading: %s.  Sleeping' % result['moisture'], mins=3)
-        # e_wrap.call_reset(exc='Moisture reading: %s. Calling reset' % result['moisture'])
+        e_wrap.call_reset(exc='Error reading sensors. Check hardware! Calling reset')
 
     (pressure_value, moisture_value) = e_wrap.wrap(
         ReadRTCMemory,
-        result['rel_Pres_Rounded_hPa'],
-        result['moisture']
+        result['rel_Pres_Rounded_hPa']
     )
 
     if CONF['time']['DST']['USE_DST']:
@@ -334,52 +383,51 @@ def main():
     else:
         dst_adjustment = 0
 
+    def secs_to_human(secs):
+        m, s = divmod(secs, 60)
+        h, m = divmod(m, 60)
+        return f'{h:d}:{m:02d}:{s:02d}'
+    
     p_ts_diff = current_timestamp - last_pval_timestamp + dst_adjustment
-    p_m, p_s = divmod(p_ts_diff, 60)
-    p_h, p_m = divmod(p_m, 60)
-    print(f'Pressure Timestamp difference: {p_ts_diff:d} secs or {p_h:d}:{p_m:02d}:{p_s:02d}')
+    print(f'Pressure Timestamp difference: {p_ts_diff:d} secs or {secs_to_human(p_ts_diff)}')
 
     m_ts_diff = current_timestamp - last_mval_timestamp + dst_adjustment
-    m_m, m_s = divmod(m_ts_diff, 60)
-    m_h, m_m = divmod(m_m, 60)
-    print(f'Moisture Timestamp difference: {m_ts_diff:d} secs or {m_h:d}:{m_m:02d}:{m_s:02d}')
+    print(f'Moisture Timestamp difference: {m_ts_diff:d} secs or {secs_to_human(m_ts_diff)}')
 
-    time_limit_p = SECS_IN_HOUR // 2 # 30 mins
+    time_limit_p = SECS_IN_MIN * 30 # 30 mins
     time_limit_m = SECS_IN_HOUR * CONF['other']['WT_AVG_HOURS']
     take_p = p_ts_diff >= time_limit_p
     take_m = m_ts_diff >= time_limit_m
-    flush_p = p_ts_diff >= SECS_IN_HOUR * 2
-    flush_m = m_ts_diff >= SECS_IN_HOUR * mval_count * CONF['other']['WT_AVG_HOURS'] / 4 # rough calculation
+    flush_limit_p = SECS_IN_HOUR * 2
+    flush_limit_m = int(SECS_IN_HOUR * mval_count * CONF['other']['WT_AVG_HOURS'] / 4) # rough calculation
+    flush_p = p_ts_diff >= flush_limit_p
+    flush_m = m_ts_diff >= flush_limit_m
     p_tstamp = current_timestamp if take_p else last_pval_timestamp + dst_adjustment
     m_tstamp = current_timestamp if take_m else last_mval_timestamp + dst_adjustment
 
+
     if take_p:
-        tlp_m, tlp_s = divmod(time_limit_p, 60)
-        tlp_h, tlp_m = divmod(tlp_m, 60)
-        print(f'Pressure Time difference longer than {tlp_h:d}:{tlp_m:02d}:{tlp_s:02d}')
-        print('Recording pressure value of %s in RTC Memory' % result['rel_Pres_Rounded_hPa'])
+        print('Pressure Time difference longer than %s' % secs_to_human(time_limit_p))
     if take_m:
-        tlm_m, tlm_s = divmod(time_limit_m, 60)
-        tlm_h, tlm_m = divmod(tlm_m, 60)
-        print(f'Moisture Time difference longer than {tlm_h:d}:{tlm_m:02d}:{tlm_s:02d}')
-        print('Recording moisture value of %s in RTC Memory' % result['moisture'])
-    
+        print('Moisture Time difference longer than %s' % secs_to_human(time_limit_m))
+
     if flush_p or flush_m:
         if flush_p:
-            print('More than 2 hours since last pressure reading!')
+            print('More than %s since last pressure reading!' % secs_to_human(flush_limit_p))
             print('Flushing pressure_value list')
             # reset pressure_value
             pressure_value = [result['rel_Pres_Rounded_hPa'] for _ in range(pval_count)]
 
         if flush_m:
-            print('More than  since last moisture reading!')
+            print('More than %s since last moisture reading!' % secs_to_human(flush_limit_m))
             print('Flushing moisture value list')
             # reset moisture_value
-            moisture_value = [result['moisture']]
+            moisture_value = [MoistureReading()]
 
     elif take_p or take_m: # take pressure or moisture reading
         # pressure
         if take_p:
+            print('\nRecording pressure value of %s in RTC Memory' % result['rel_Pres_Rounded_hPa'])
             # prepend list with new pressure value and remove one value from end
             pressure_value = [result['rel_Pres_Rounded_hPa']] + pressure_value[:-1]
 
@@ -388,11 +436,13 @@ def main():
 
         # moisture
         if take_m:
-            moisture_reading = result['moisture']
+            moisture_reading = MoistureReading()
+            print('\nRecording moisture value of %s in RTC Memory' % moisture_reading)
             moisture_value = [moisture_reading] + moisture_value
             if len(moisture_value) > mval_count:
-                moisture_value = moisture_value[:-1]
-            ## moisture_value = [int(moisture_voltage * 1000)] + moisture_value[:-1]
+                moisture_value = moisture_value[:mval_count]
+
+    ldr_value = LDRReading()
 
     # write data to RTC memory
     e_wrap.wrap(
@@ -405,15 +455,16 @@ def main():
 
     # make sure  we record on the interval
     interval = CONF['other']['SLEEP_TIME_MIN'] * 60
-    diff_from_half_hour = SECS_IN_HOUR / 2 - p_ts_diff
+    interval_diff = time_limit_p - p_ts_diff
 
-    if diff_from_half_hour >= 0:
-        if diff_from_half_hour >= interval:
+    if interval_diff >= 0:
+        if interval_diff >= interval:
             sleep_time_secs = interval
         else:
-            sleep_time_secs = diff_from_half_hour
+            sleep_time_secs = interval_diff
     else:
         sleep_time_secs = interval
+    # sleep_time_secs = CONF['other']['SLEEP_TIME_MIN'] * 60
 
     (ZambrettisWords,
      trend_in_words,
@@ -434,12 +485,13 @@ def main():
             result['temp_F'],
             result['humidity'],
             result['dewPt_F'],
-            result['dewPtSpread_F'],
+            # result['dewPtS'],
+            ldr_value,
             result['heatIndex_F'],
             result['measured_Pres_inHg'],
             result['rel_Pres_inHg'],
             result['volt'],
-            result['moisture'],
+            # result['moisture'],
             moisture_avg,
             accuracy_in_percent,
             ZambrettisWords,
@@ -448,8 +500,7 @@ def main():
         'sleep_time_secs': sleep_time_secs # need this in one place
     }
 
-    print('\nMoisture Reading: %.2f' % result['moisture'])
-    print('Moisture Average: %.2f' % moisture_avg)
+    print('\nMoisture Average: %.2f' % moisture_avg)
     print('Battery Voltage: %s' % result['volt'])
 
     del CONF

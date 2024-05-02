@@ -9,7 +9,7 @@
 # 2023-05-29 -- added set_ts()
 # 2023-06-23 -- added custom errors, write_exception()
 
-from user_except import CustomNetworkError, CustomResetError, CustomHWError
+from user_except import CustomNetworkError, CustomResetError, CustomHWError, CustomMoistureSensorError
 
 class ErrorWrapper(object):
     def __init__(self, log, timestamp=None, sleep_mins=10):
@@ -30,11 +30,12 @@ class ErrorWrapper(object):
             sys.print_exception(exception, file)
          print('Error: Logged to %s' % self._log)
 
-    def sleep_it_off(self, exc, mins=None):
+    def sleep_it_off(self, exc, mins=None, log=True):
         from cycle_machine import GoToSleep
         sleep_mins = mins if mins is not None else self._sleep_mins
 
-        self.write_exception(exc)
+        if log:
+            self.write_exception(exception=exc)
         print('Sleeping for %d minutes' % sleep_mins)
         GoToSleep(sleep_time_secs=sleep_mins * 60)
 
@@ -60,6 +61,9 @@ class ErrorWrapper(object):
 
         except CustomHWError as chwe:
             self.sleep_it_off(exc=chwe, mins=3)
+
+        except CustomMoistureSensorError as cmse:
+            self.sleep_it_off(exc="Error reading moisture sensor", mins=3)
 
         except Exception as e:
             self.call_reset(exc=e)

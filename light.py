@@ -1,16 +1,16 @@
-def take_moisture_ads1x15(i2c=None):
+def read_ldr_ads1x15(i2c=None):
     import sys
     from time import sleep
     from machine import I2C, Pin
     import ads1x15
-    from user_except import CustomMoistureSensorError
-    
+    from user_except import CustomLDRSensorError
+
     addr = 72 # 0x48
     gain = 1
 
     rate = 4
-    channel = 0
-    
+    channel = 1
+
     try:
         if i2c is None:
             sleep(0.5)
@@ -27,13 +27,6 @@ def take_moisture_ads1x15(i2c=None):
         # return (value, voltage)
         return value
     except Exception as e:
-        raise CustomMoistureSensorError('Error reading moisture sensor: %s' % e)
-    
-    # ADDR to GND to set address? NOT NEEDED PER ADAFRUIT
-    
-def take_moisture(MOIST_PIN):
-    from machine import ADC
-    adc = ADC(MOIST_PIN, atten=ADC.ATTN_11DB)
-    value = adc.read_uv()
+        raise CustomLDRSensorError('Error reading LDR sensor: %s' % e) from e
 
-    return value
+    # ADDR to GND to set address? NOT NEEDED PER ADAFRUIT

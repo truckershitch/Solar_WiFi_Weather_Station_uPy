@@ -1,16 +1,15 @@
-from machine import Pin, I2C, ADC
+from machine import ADC
 from math import pow, sqrt, fabs
 from time import sleep
 import sys
 import bme280_int
 
-def TakeMeasurement(CONF_WEATHER, calib_factor):
+def TakeMeasurement(CONF_WEATHER, calib_factor, i2c):
     result = {}
 
     def convertToF(tempC):
         return tempC * 1.8 + 32
 
-    i2c = I2C(scl=Pin(5), sda=Pin(4))
     bme = bme280_int.BME280(i2c=i2c)
 
     # wait a sec
@@ -99,27 +98,39 @@ def TakeMeasurement(CONF_WEATHER, calib_factor):
     
     # Battery Voltage
     # Voltage Divider R1 = 220k+100k+220k = 540K and R2 = 100k
+    
+    # esp8266
     adc = ADC(0)
     raw = adc.read()
-    result['volt'] = raw * calib_factor / 1024
+    result['volt'] = raw * calib_factor / 1024 # esp8266
+
+    # # esp32
+    # ADC_PIN = 36
+    # # adc = ADC(ADC_PIN, atten=ADC.ATTN_11DB)
+    # adc = ADC(ADC_PIN)
+    # raw = adc.read_uv()
+    # result['volt'] = raw / 1000000 * calib_factor # esp32
+    
     output.append('Voltage: %.2f V; ' % result['volt'])
 
     del bme
     del sys.modules['bme280_int']
     
-    from moisture import take_moisture
-    moisture_reading = take_moisture(i2c=i2c)
-    result['moisture'] = moisture_reading[0]
+    # from moisture import take_moisture
+    # moisture_reading = take_moisture(i2c=i2c)
+    # # result['moisture'] = moisture_reading[0]
+    # result['moisture'] = moisture_reading
     
-    output.append('Moisture value: %s; Moisture Voltage: %s V\n' %
-                  (moisture_reading[0], moisture_reading[1]))
+    # # output.append('Moisture value: %s; Moisture Voltage: %s V\n' %
+    # #               (moisture_reading[0], moisture_reading[1]))
+    # output.append('Moisture value: %s' % moisture_reading)
 
     print(''.join(output))
     
     # round floats to 2 decimal places
     result = dict(zip(result, map(lambda x: round(x, 2) if isinstance(x, float) else x, result.values())))
 
-    del take_moisture
-    del sys.modules['moisture']
+    # del take_moisture
+    # del sys.modules['moisture']
 
     return result

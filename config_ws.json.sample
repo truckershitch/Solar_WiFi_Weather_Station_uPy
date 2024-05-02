@@ -31,11 +31,16 @@
             "COUNTRY": "US"
         }
     },
+    "location": {
+        "LATITUDE": 40.7128,
+        "LONGITUDE": -74.0060
+    },
     "other": {
         "SLEEP_TIME_MIN": 15,
         "BATT_CALIB": 5.375,
         "WT_AVG_HOURS": 1,
         "WT_AVG_FACTOR_MAX": 2.0,
-        "WT_AVG_FACTOR_MIN": 0.5
+        "WT_AVG_FACTOR_MIN": 0.5,
+        "MOIST_PIN": 35
     }
 }
